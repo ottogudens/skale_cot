@@ -10,6 +10,7 @@ Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, 
 - Ítems con cantidad, unidad, descripción, precio unitario, neto, IVA y total.
 - Clientes y catálogo reutilizable de equipos y servicios.
 - Configuración del nombre comercial, datos de empresa, logo, IVA, validez predeterminada y términos.
+- Asistente de terreno con dictado en español, borrador conversacional de cotización, propuestas de clientes y equipos/servicios, y confirmación antes de guardar.
 - PostgreSQL con Prisma y migración versionada.
 
 ## Requisitos
@@ -20,7 +21,7 @@ Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, 
 
 ## Ejecutar localmente
 
-1. Duplica `.env.example` como `.env` y completa `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Usa una contraseña de al menos 12 caracteres y un secreto aleatorio largo para `AUTH_SECRET`.
+1. Duplica `.env.example` como `.env` y completa `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Para el asistente, añade una clave de OpenAI en `OPENAI_API_KEY`; `OPENAI_MODEL` es opcional y por defecto usa `gpt-5.6-luna`. Usa una contraseña de al menos 12 caracteres y un secreto aleatorio largo para `AUTH_SECRET`.
 2. Instala dependencias y prepara la base:
 
    ```bash
@@ -61,11 +62,15 @@ Sube el contenido de esta carpeta como raíz del repositorio. No incluyas `.env`
 
    - `DATABASE_URL`: URL pública de Railway con `sslmode=require` y, para cargas pequeñas, `connection_limit=5`.
    - `AUTH_SECRET`: una cadena aleatoria de al menos 32 caracteres. Puedes generar una con `openssl rand -base64 48`.
+   - `OPENAI_API_KEY`: clave secreta de OpenAI API (requerida para el asistente de terreno).
+   - `OPENAI_MODEL`: opcional; por defecto `gpt-5.6-luna`.
 
 4. Despliega. `vercel.json` hace que cada build aplique primero las migraciones (`prisma migrate deploy`) y luego compile Next.js.
 5. Abre el dominio de Vercel e inicia sesión con el usuario creado en el paso del seed.
 
 Vercel no necesita `ADMIN_EMAIL` ni `ADMIN_PASSWORD` en runtime; solo se usan al crear el usuario inicial mediante seed. No pongas esas credenciales en variables Preview conectadas a la base de producción.
+
+El asistente envía a OpenAI el texto de la conversación y los datos de clientes/catálogo necesarios para preparar sugerencias. La aplicación no guarda cambios por el agente sin confirmación explícita. El dictado usa el reconocimiento de voz disponible en navegadores compatibles; el navegador solicitará permiso de micrófono.
 
 ## Operación y copias de seguridad
 

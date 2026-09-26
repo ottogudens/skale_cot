@@ -1,5 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+const FieldAssistant = dynamic(() => import('@/components/field-assistant').then(module => module.FieldAssistant), { ssr: false });
 
 type User={id:string;email:string;name:string};
 type Client={id:string;name:string;rut:string;email:string;phone:string;address:string;contact:string;notes:string;_count?:{quotes:number}};
@@ -17,6 +20,7 @@ function App(){
  const [user,setUser]=useState<User|null>(null),[loading,setLoading]=useState(true),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[loginBusy,setLoginBusy]=useState(false),[error,setError]=useState('');
  const [section,setSection]=useState('dashboard'),[quotes,setQuotes]=useState<Quote[]>([]),[clients,setClients]=useState<Client[]>([]),[products,setProducts]=useState<Product[]>([]),[settings,setSettings]=useState<Settings>(emptySettings),[busy,setBusy]=useState(false),[query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('TODAS');
  const [modal,setModal]=useState(''),[editingQuote,setEditingQuote]=useState<Quote|null>(null),[printQuote,setPrintQuote]=useState<Quote|null>(null),[editClient,setEditClient]=useState<Client|null>(null),[editProduct,setEditProduct]=useState<Product|null>(null),[toast,setToast]=useState('');
+ const [assistantOpen,setAssistantOpen]=useState(false);
  const notify=(s:string)=>{setToast(s);window.setTimeout(()=>setToast(''),3200)};
  const load=useCallback(async()=>{setBusy(true);try{const [q,c,p,s]=await Promise.all([api<Quote[]>('/api/quotes'),api<Client[]>('/api/clients'),api<Product[]>('/api/catalog'),api<Settings>('/api/settings')]);setQuotes(q);setClients(c);setProducts(p);setSettings(s)}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setBusy(false)}},[]);
  useEffect(()=>{api<User>('/api/auth/me').then(setUser).catch(()=>setUser(null)).finally(()=>setLoading(false))},[]);
@@ -32,6 +36,9 @@ function App(){
  async function saveSettings(value:Settings){await api('/api/settings',{method:'PUT',body:JSON.stringify(value)});setSettings(value);setModal('');notify('Configuración guardada')}
  async function saveClient(value:Omit<Client,'id'|'_count'>){if(editClient)await api(`/api/clients/${editClient.id}`,{method:'PUT',body:JSON.stringify(value)});else await api('/api/clients',{method:'POST',body:JSON.stringify(value)});setModal('');setEditClient(null);await load();notify(editClient?'Cliente actualizado':'Cliente creado')}
  async function saveProduct(value:Omit<Product,'id'>){if(editProduct)await api(`/api/catalog/${editProduct.id}`,{method:'PUT',body:JSON.stringify(value)});else await api('/api/catalog',{method:'POST',body:JSON.stringify(value)});setModal('');setEditProduct(null);await load();notify(editProduct?'Ítem actualizado':'Ítem creado')}
+ async function assistantCreateClient(value:Omit<Client,'id'|'_count'>){const created=await api<Client>('/api/clients',{method:'POST',body:JSON.stringify(value)});await load();notify('Cliente agregado');return created}
+ async function assistantCreateProduct(value:Omit<Product,'id'>){await api('/api/catalog',{method:'POST',body:JSON.stringify(value)});await load();notify('Ítem agregado al catálogo')}
+ async function assistantCreateQuote(draft:{title:string;notes:string;items:Line[]},clientId:string){const issuedAt=new Date(),validUntil=new Date(issuedAt);validUntil.setDate(validUntil.getDate()+settings.defaultValidity);await api<Quote>('/api/quotes',{method:'POST',body:JSON.stringify({title:draft.title,clientId,status:'BORRADOR',issuedAt:issuedAt.toISOString(),validUntil:validUntil.toISOString(),notes:draft.notes||settings.terms,taxRate:settings.defaultTaxRate,items:draft.items.map(({name,description,quantity,unit,unitPrice})=>({name,description,quantity,unit,unitPrice}))})});await load();setSection('quotes');notify('Cotización creada desde el asistente')}
  async function deleteClient(c:Client){if(!confirm(`¿Eliminar cliente ${c.name}?`))return;try{await api(`/api/clients/${c.id}`,{method:'DELETE'});await load();notify('Cliente eliminado')}catch(e){notify(e instanceof Error?e.message:'No se pudo eliminar')}}
  async function deleteProduct(p:Product){if(!confirm(`¿Eliminar ${p.name} del catálogo?`))return;try{await api(`/api/catalog/${p.id}`,{method:'DELETE'});await load();notify('Ítem eliminado')}catch(e){notify(e instanceof Error?e.message:'No se pudo eliminar')}}
  if(loading)return <div className="loading-screen"><Logo/><span>Preparando tu espacio…</span></div>;
@@ -47,6 +54,7 @@ function App(){
  {modal==='quote'&&<QuoteModal initial={editingQuote} clients={clients} products={products.filter(p=>p.active)} settings={settings} onClose={()=>setModal('')} onSave={async data=>{const route=editingQuote?`/api/quotes/${editingQuote.id}`:'/api/quotes';const q=await api<Quote>(route,{method:editingQuote?'PUT':'POST',body:JSON.stringify(data)});await load();setModal('');notify(editingQuote?'Cotización actualizada':'Cotización creada');return q}} onError={notify}/>}
  {modal==='client'&&<ClientModal initial={editClient} onClose={()=>setModal('')} onSave={saveClient}/>}
  {modal==='product'&&<ProductModal initial={editProduct} onClose={()=>setModal('')} onSave={saveProduct}/>}
+ {assistantOpen?<FieldAssistant clients={clients} taxRate={settings.defaultTaxRate} onCreateClient={assistantCreateClient} onCreateProduct={assistantCreateProduct} onCreateQuote={assistantCreateQuote} onClose={()=>setAssistantOpen(false)}/>:<button className="assistant-fab" onClick={()=>setAssistantOpen(true)}><span>✦</span> Cotizar con IA</button>}
  {toast&&<div className="toast">✓ &nbsp;{toast}</div>}
  </div>{printQuote&&<Printable quote={printQuote} settings={settings} onDone={()=>setPrintQuote(null)}/>}</>
 }
