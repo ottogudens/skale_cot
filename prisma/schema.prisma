@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String   @default("Administrador")
+  createdAt    DateTime @default(now())
+  quotes       Quote[]
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  rut       String   @default("")
+  email     String   @default("")
+  phone     String   @default("")
+  address   String   @default("")
+  contact   String   @default("")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  quotes    Quote[]
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  category    String   @default("Otros")
+  unit        String   @default("un")
+  price       Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Quote {
+  id          String      @id @default(cuid())
+  number      String      @unique
+  title       String
+  status      String      @default("BORRADOR")
+  issuedAt    DateTime    @default(now())
+  validUntil  DateTime?
+  notes       String      @default("")
+  net         Int         @default(0)
+  taxRate     Int         @default(19)
+  tax         Int         @default(0)
+  total       Int         @default(0)
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       QuoteItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model QuoteItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  name        String
+  description String   @default("")
+  quantity    Int      @default(1)
+  unit        String   @default("un")
+  unitPrice   Int
+  amount      Int
+  position    Int      @default(0)
+}
+
+model Settings {
+  id              String   @id @default("singleton")
+  companyName     String   @default("Nexo Ingeniería")
+  companyTagline  String   @default("Redes · Telecomunicaciones · Automatización")
+  rut             String   @default("")
+  email           String   @default("")
+  phone           String   @default("")
+  address         String   @default("")
+  website         String   @default("")
+  logoData        String   @default("")
+  defaultTaxRate  Int      @default(19)
+  defaultValidity Int      @default(15)
+  terms           String   @default("Precios expresados en pesos chilenos (CLP). Cotización válida durante el plazo indicado. Garantía de equipos según fabricante.")
+  updatedAt       DateTime @updatedAt
+}
