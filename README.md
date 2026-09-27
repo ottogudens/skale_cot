@@ -76,6 +76,10 @@ Desde **Catálogo → Importar desde proveedor**, pega la URL pública de un pro
 
 En **Catálogo** puedes alternar entre vista de lista y tarjetas, buscar por nombre/marca/SKU/descripción, filtrar por categoría y ordenar por nombre, categoría o precio. En **Categorías** puedes crear categorías personalizadas y cambiar sus nombres; al renombrar, los productos asociados se actualizan. **Respaldo Excel** descarga el catálogo completo con sus costos, utilidad, precios, procedencia y estado. **Importar Excel** acepta `.xlsx` con la planilla de respaldo o encabezados equivalentes; valida todas las filas antes de guardar y omite duplicados existentes. La migración añade el almacenamiento persistente de categorías en PostgreSQL.
 
+El menú **Servicios** mantiene un catálogo separado para mano de obra y servicios técnicos, con crear/editar/eliminar, alcance, condiciones, unidad, precio y estado. La opción **Investigar con IA** usa OpenAI `gpt-4o-mini` con búsqueda web en vivo y devuelve un rango, precio sugerido, condiciones y enlaces de referencia para revisión; es una sugerencia, no una tasación garantizada. La migración añade diez ejemplos iniciales de redes, CCTV, Wi-Fi, racks, control de acceso y soporte. Sus precios son CLP netos de equipos; algunos tienen referencias públicas y los demás se deben revisar para la zona y complejidad del trabajo.
+
+El tratamiento de IVA se configura por servicio y línea de cotización. Los servicios se crean afectos por defecto y se puede marcar “Exento/no afecto” si la operación califica. Desde 2023 el SII indica que los servicios están gravados como regla general, salvo que aplique una exención legal; la mano de obra por sí sola no determina la exención.
+
 ## Operación y copias de seguridad
 
 - Toma copias de seguridad desde Railway antes de cambios importantes de esquema y configura su política de backups según tu plan.

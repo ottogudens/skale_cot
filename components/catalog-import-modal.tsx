@@ -9,6 +9,7 @@ const money = (value: number) => new Intl.NumberFormat('es-CL', { style: 'curren
 export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; onSaved: (created: number, skipped: number) => Promise<void> }) {
   const [url, setUrl] = useState(''); const [products, setProducts] = useState<Imported[]>([]);
   const [utilityMode, setUtilityMode] = useState<UtilityMode>('MARKUP'); const [utilityPercent, setUtilityPercent] = useState(25);
+  const [bulkCategory, setBulkCategory] = useState('');
   const [basisConfirmed, setBasisConfirmed] = useState(false); const [extracting, setExtracting] = useState(false); const [saving, setSaving] = useState(false); const [excelBusy, setExcelBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [truncated, setTruncated] = useState(false);
   const selected = useMemo(() => products.filter(product => product.selected), [products]);
   const selectedWithoutCost = selected.filter(product => product.costPrice === null || product.costPrice <= 0).length;
@@ -29,6 +30,7 @@ export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; 
     if (key === 'costPrice') setBasisConfirmed(false);
   }
   function selectAll(selectedValue: boolean) { setProducts(current => current.map(product => ({ ...product, selected: selectedValue }))); }
+  function applyCategoryToSelected() { const value = bulkCategory.trim(); if (!value) return; setProducts(current => current.map(product => product.selected ? { ...product, category: value } : product)); setBulkCategory(''); }
   function prepared(product: Imported) {
     const { selected: _selected, ...data } = product;
     return { ...data, costPrice: data.costPrice && data.costPrice > 0 ? data.costPrice : null, utilityMode, utilityPercent, price: data.costPrice && data.costPrice > 0 ? sellingPrice(data.costPrice, utilityPercent, utilityMode) : 0, active: true };
@@ -64,6 +66,7 @@ export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; 
       <div className="import-source-note">Solo se consultan páginas HTTPS públicas. La extracción lee HTML, datos estructurados y tarjetas de productos; páginas que renderizan el catálogo únicamente con JavaScript podrían requerir carga manual. Límite de 500 productos por página.</div>
       {products.length > 0 && <>
         <div className="bulk-toolbar"><div><b>{selected.length} de {products.length} seleccionados</b><span>Los precios publicados se conservan como referencia. Ingresa y verifica el costo neto en CLP.</span></div><div><button type="button" className="button outline compact" onClick={() => selectAll(true)}>Seleccionar todos</button><button type="button" className="button outline compact" onClick={() => selectAll(false)}>Ninguno</button></div></div>
+        <div className="bulk-category-action"><label className="field">Asignar categoría a los seleccionados<input list="bulk-category-options" value={bulkCategory} maxLength={80} placeholder="Escribe o elige una categoría" onChange={event => setBulkCategory(event.target.value)}/><datalist id="bulk-category-options">{Array.from(new Set(products.map(product=>product.category).filter(Boolean))).map(category=><option key={category} value={category}/>)}</datalist></label><button type="button" className="button outline compact" disabled={!selected.length||!bulkCategory.trim()} onClick={applyCategoryToSelected}>Aplicar a {selected.length} productos</button></div>
         <div className="bulk-utility form-grid"><label className="field">Regla de utilidad<select value={utilityMode} onChange={event => setUtilityMode(event.target.value as UtilityMode)}><option value="MARKUP">Recargo sobre costo</option><option value="MARGIN">Margen sobre precio de venta</option></select></label><label className="field">Porcentaje (%)<input type="number" min="0" max={utilityMode === 'MARGIN' ? 99 : 1000} step="1" value={utilityPercent} onChange={event => setUtilityPercent(Math.max(0, Number(event.target.value)))}/></label><div className="bulk-formula"><b>{utilityMode === 'MARKUP' ? `Costo × (1 + ${utilityPercent}%)` : `Costo ÷ (1 − ${utilityPercent}%)`}</b><span>El catálogo calcula el precio de venta sugerido con esta regla.</span></div></div>
         <div className="bulk-table-wrap"><table className="bulk-product-table"><thead><tr><th>✓</th><th>Producto</th><th>Marca / SKU</th><th>Costo neto CLP</th><th>Precio de origen</th><th>Venta sugerida</th><th>Unidad / categoría</th></tr></thead><tbody>{products.map((product, index) => {
           const suggested = product.costPrice && product.costPrice > 0 ? sellingPrice(product.costPrice, utilityPercent, utilityMode) : null;

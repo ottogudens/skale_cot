@@ -60,6 +60,26 @@ model CatalogCategory {
   updatedAt DateTime @updatedAt
 }
 
+model ServiceItem {
+  id               String   @id @default(cuid())
+  name             String
+  description      String   @default("")
+  scope            String   @default("")
+  conditions       String   @default("")
+  category         String   @default("Servicios técnicos")
+  unit             String   @default("servicio")
+  price            Int
+  marketMinPrice   Int?
+  marketMaxPrice   Int?
+  marketRationale  String   @default("")
+  marketSources    String   @default("[]")
+  marketCheckedAt  DateTime?
+  taxExempt        Boolean  @default(false)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model Quote {
   id          String      @id @default(cuid())
   number      String      @unique
@@ -91,6 +111,7 @@ model QuoteItem {
   unit        String   @default("un")
   unitPrice   Int
   amount      Int
+  taxExempt   Boolean  @default(false)
   position    Int      @default(0)
 }
 

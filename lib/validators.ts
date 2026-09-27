@@ -24,5 +24,16 @@ export const catalogSchema = z.object({
   const price = sellingPrice(item.costPrice, item.utilityPercent, item.utilityMode);
   return { ...item, price };
 });
-export const quoteSchema = z.object({ title: z.string().trim().min(1).max(180), clientId: z.string().min(1), status: z.enum(['BORRADOR','ENVIADA','ACEPTADA','RECHAZADA','VENCIDA']).default('BORRADOR'), issuedAt: z.string().optional(), validUntil: z.string().optional(), notes: z.string().max(5000).default(''), taxRate: z.coerce.number().int().min(0).max(100).default(19), items: z.array(z.object({ name: z.string().trim().min(1).max(180), description: z.string().max(500).default(''), quantity: z.coerce.number().int().min(1).max(100000), unit: z.string().max(30).default('un'), unitPrice: z.coerce.number().int().min(0).max(2_000_000_000) })).min(1) });
+export const quoteSchema = z.object({ title: z.string().trim().min(1).max(180), clientId: z.string().min(1), status: z.enum(['BORRADOR','ENVIADA','ACEPTADA','RECHAZADA','VENCIDA']).default('BORRADOR'), issuedAt: z.string().optional(), validUntil: z.string().optional(), notes: z.string().max(5000).default(''), taxRate: z.coerce.number().int().min(0).max(100).default(19), items: z.array(z.object({ name: z.string().trim().min(1).max(180), description: z.string().max(500).default(''), quantity: z.coerce.number().int().min(1).max(100000), unit: z.string().max(30).default('un'), unitPrice: z.coerce.number().int().min(0).max(2_000_000_000), taxExempt: z.boolean().default(false) })).min(1) });
+export const serviceSchema = z.object({
+  name: z.string().trim().min(1).max(180), description: z.string().max(1000).default(''), scope: z.string().max(3000).default(''), conditions: z.string().max(3000).default(''),
+  category: z.string().trim().min(1).max(80).default('Servicios técnicos'), unit: z.string().max(30).default('servicio'), price: z.coerce.number().int().min(0).max(MAX_CATALOG_PRICE),
+  marketMinPrice: z.coerce.number().int().min(0).max(MAX_CATALOG_PRICE).nullable().optional().default(null), marketMaxPrice: z.coerce.number().int().min(0).max(MAX_CATALOG_PRICE).nullable().optional().default(null),
+  marketRationale: z.string().max(3000).default(''), marketSources: z.array(z.object({ title: z.string().max(240), url: z.string().url().max(2048), note: z.string().max(500).default('') })).max(20).default([]),
+  marketCheckedAt: z.coerce.date().nullable().optional().default(null), taxExempt: z.boolean().default(false), active: z.boolean().default(true),
+}).superRefine((service, ctx) => {
+  if (service.marketMinPrice !== null && service.marketMinPrice !== undefined && service.marketMaxPrice !== null && service.marketMaxPrice !== undefined && service.marketMinPrice > service.marketMaxPrice) {
+    ctx.addIssue({ code: 'custom', path: ['marketMinPrice'], message: 'El precio mínimo no puede superar el máximo.' });
+  }
+}).transform(service => ({ ...service, marketSources: JSON.stringify(service.marketSources) }));
 export const settingsSchema = z.object({ companyName: z.string().trim().min(1).max(180), companyTagline: z.string().max(180).default(''), rut: z.string().max(30).default(''), email: z.string().max(180).default(''), phone: z.string().max(60).default(''), address: z.string().max(250).default(''), website: z.string().max(180).default(''), logoData: z.string().max(1_500_000).default(''), defaultTaxRate: z.coerce.number().int().min(0).max(100), defaultValidity: z.coerce.number().int().min(1).max(365), terms: z.string().max(5000).default('') });

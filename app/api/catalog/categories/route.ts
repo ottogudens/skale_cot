@@ -5,13 +5,14 @@ import { z } from 'zod';
 const categorySchema = z.object({ name: z.string().trim().min(1).max(80) });
 
 export const GET = () => api(async () => {
-  const [saved, used] = await Promise.all([
+  const [saved, usedProducts, usedServices] = await Promise.all([
     db.catalogCategory.findMany({ orderBy: { name: 'asc' } }),
     db.catalogItem.findMany({ distinct: ['category'], select: { category: true } }),
+    db.serviceItem.findMany({ distinct: ['category'], select: { category: true } }),
   ]);
   const categories = new Map<string, { id: string; name: string; custom: boolean }>();
   for (const category of saved) categories.set(category.name.toLocaleLowerCase('es-CL'), { id: category.id, name: category.name, custom: true });
-  for (const entry of used) if (entry.category.trim() && !categories.has(entry.category.toLocaleLowerCase('es-CL'))) categories.set(entry.category.toLocaleLowerCase('es-CL'), { id: '', name: entry.category, custom: false });
+  for (const entry of [...usedProducts, ...usedServices]) if (entry.category.trim() && !categories.has(entry.category.toLocaleLowerCase('es-CL'))) categories.set(entry.category.toLocaleLowerCase('es-CL'), { id: '', name: entry.category, custom: false });
   return Array.from(categories.values()).sort((a, b) => a.name.localeCompare(b.name, 'es-CL'));
 });
 
