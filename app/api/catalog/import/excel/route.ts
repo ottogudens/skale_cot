@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   try {
     await requireUser();
     const parsed = z.object({ products: z.array(row).min(1).max(500) }).parse(await req.json());
-    const products: WorkbookProduct[] = parsed.products.map(product => ({ ...product, price: product.costPrice === null ? 0 : sellingPrice(product.costPrice, product.utilityPercent, product.utilityMode) }));
+    const products: WorkbookProduct[] = parsed.products.map(product => ({ ...product, id: '', active: true, price: product.costPrice === null ? 0 : sellingPrice(product.costPrice, product.utilityPercent, product.utilityMode) }));
     const bytes = createProductWorkbook(products);
     return new NextResponse(new Blob([bytes as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), {
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="productos-proveedor.xlsx"', 'Cache-Control': 'no-store' },

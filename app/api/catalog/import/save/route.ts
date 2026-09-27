@@ -16,7 +16,11 @@ export async function POST(req: Request) {
       keys.add(key);
       return true;
     });
-    if (fresh.length) await db.$transaction(fresh.map(item => db.catalogItem.create({ data: item })));
+    if (fresh.length) await db.$transaction(async transaction => {
+      const names = Array.from(new Set(fresh.map(item => item.category.trim()).filter(Boolean)));
+      if (names.length) await transaction.catalogCategory.createMany({ data: names.map(name => ({ name })), skipDuplicates: true });
+      await transaction.catalogItem.createMany({ data: fresh });
+    });
     return { created: fresh.length, skipped: products.length - fresh.length };
   }, 201);
 }

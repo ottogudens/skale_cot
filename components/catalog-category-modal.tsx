@@ -1,0 +1,18 @@
+'use client';
+
+import { useState } from 'react';
+import type { CatalogCategory } from '@/components/catalog-panel';
+
+export function CatalogCategoryModal({ categories, onClose, onCreate, onRename }: { categories: CatalogCategory[]; onClose: () => void; onCreate: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void> }) {
+  const [newName, setNewName] = useState(''), [editing, setEditing] = useState<CatalogCategory|null>(null), [editName, setEditName] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  async function create(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(''); try { await onCreate(newName.trim()); setNewName(''); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo crear la categoría.'); } finally { setBusy(false); } }
+  async function rename(event: React.FormEvent) { event.preventDefault(); if (!editing) return; setBusy(true); setError(''); try { await onRename(editing.id, editName.trim()); setEditing(null); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo editar la categoría.'); } finally { setBusy(false); } }
+  return <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section className="modal category-modal" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
+    <header className="modal-head"><div><h2 id="category-modal-title">Categorías del catálogo</h2><p>Organiza tus equipos y servicios con categorías propias.</p></div><button type="button" className="modal-close" onClick={onClose}>×</button></header>
+    <div className="modal-body category-modal-body"><form className="category-create-form" onSubmit={create}><label className="field">Nueva categoría<input autoFocus maxLength={80} required value={newName} onChange={event => setNewName(event.target.value)} placeholder="Ej. Fibra óptica"/></label><button className="button primary" disabled={busy||!newName.trim()}>＋ Crear</button></form>
+      <div className="category-list-label">CATEGORÍAS DISPONIBLES · {categories.length}</div><div className="category-manager-list">{categories.map(category=><div className="category-manager-row" key={category.id||category.name}>{editing?.id===category.id&&category.custom?<form className="category-rename-form" onSubmit={rename}><input autoFocus required maxLength={80} value={editName} onChange={event => setEditName(event.target.value)}/><button className="button primary compact" disabled={busy}>Guardar</button><button type="button" className="button outline compact" onClick={() => setEditing(null)}>Cancelar</button></form>:<><span>{category.name}{!category.custom&&<small>Se usa en el catálogo</small>}</span>{category.custom?<button className="row-action-link" onClick={() => { setEditing(category); setEditName(category.name); setError(''); }}>Editar nombre</button>:<small className="category-fixed-label">Automática</small>}</>}</div>)}{categories.length===0&&<p className="empty-line">Todavía no hay categorías.</p>}</div>
+      {error&&<div className="error-box" role="alert">{error}</div>}
+    </div><footer className="modal-foot"><span>Al renombrar, los productos existentes se actualizan automáticamente.</span><div><button type="button" className="button outline" onClick={onClose}>Cerrar</button></div></footer>
+  </section></div>;
+}
