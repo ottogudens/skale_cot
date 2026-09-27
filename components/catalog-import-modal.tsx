@@ -1,67 +1,80 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { sellingPrice, type UtilityMode } from '@/lib/pricing';
 
-type ImportedProduct = {
-  name: string; description: string; category: string; unit: string; costPrice: number | null;
-  utilityPercent: number; utilityMode: UtilityMode; sourceUrl: string; sourceCurrency: string;
-  sourcePrice: string; sourceCheckedAt: string | null; active: boolean; price: number;
-};
-type Extracted = Pick<ImportedProduct, 'name' | 'description' | 'category' | 'unit' | 'costPrice' | 'sourceUrl' | 'sourceCurrency' | 'sourcePrice' | 'sourceCheckedAt'>;
+type Imported = { name: string; brand: string; sku: string; description: string; category: string; unit: string; costPrice: number|null; sourceUrl: string; sourceCurrency: string; sourcePrice: string; sourceCheckedAt: string|null; availability: string; imageUrl: string; selected: boolean };
 const money = (value: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+const categories = ['Videovigilancia','Redes','Automatización','Control de acceso','Infraestructura','Servicios','Otros'];
 
-export function CatalogImportModal({ onClose, onSave }: { onClose: () => void; onSave: (product: ImportedProduct) => Promise<void> }) {
-  const [url, setUrl] = useState('');
-  const [product, setProduct] = useState<Extracted>({ name: '', description: '', category: 'Otros', unit: 'un', costPrice: null, sourceUrl: '', sourceCurrency: 'CLP', sourcePrice: '', sourceCheckedAt: null });
-  const [utilityMode, setUtilityMode] = useState<UtilityMode>('MARKUP');
-  const [utilityPercent, setUtilityPercent] = useState(25);
-  const [basisConfirmed, setBasisConfirmed] = useState(false);
-  const [extracting, setExtracting] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const calculated = product.costPrice === null ? null : sellingPrice(product.costPrice, utilityPercent, utilityMode);
+export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; onSaved: (created: number, skipped: number) => Promise<void> }) {
+  const [url, setUrl] = useState(''); const [products, setProducts] = useState<Imported[]>([]);
+  const [utilityMode, setUtilityMode] = useState<UtilityMode>('MARKUP'); const [utilityPercent, setUtilityPercent] = useState(25);
+  const [basisConfirmed, setBasisConfirmed] = useState(false); const [extracting, setExtracting] = useState(false); const [saving, setSaving] = useState(false); const [excelBusy, setExcelBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [truncated, setTruncated] = useState(false);
+  const selected = useMemo(() => products.filter(product => product.selected), [products]);
+  const selectedWithoutCost = selected.filter(product => product.costPrice === null || product.costPrice <= 0).length;
+  const selectedInvalid = selected.filter(product => product.costPrice !== null && (utilityMode === 'MARGIN' && utilityPercent >= 100 || sellingPrice(product.costPrice, utilityPercent, utilityMode) > 2_000_000_000));
 
-  async function extractProduct() {
-    setExtracting(true); setError(''); setBasisConfirmed(false);
+  async function extractProducts() {
+    setExtracting(true); setError(''); setNotice(''); setProducts([]); setBasisConfirmed(false);
     try {
       const response = await fetch('/api/catalog/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'No se pudieron extraer los datos.');
-      setProduct(data as Extracted); setUrl(data.sourceUrl); setBasisConfirmed(false);
-    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudieron extraer los datos.'); }
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudieron extraer los datos.');
+      setProducts((data.products as Omit<Imported,'selected'>[]).map(product => ({ ...product, selected: true }))); setUrl(data.sourceUrl); setTruncated(data.truncated);
+      setNotice(`Se encontraron ${data.totalDetected} productos${data.truncated ? ' (se muestran los primeros 500)' : ''}. Revisa los datos antes de exportar o guardar.`);
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudieron extraer los productos.'); }
     finally { setExtracting(false); }
   }
-
-  function update<K extends keyof Extracted>(key: K, value: Extracted[K]) {
-    setProduct(current => ({ ...current, [key]: value }));
+  function update(index: number, key: keyof Imported, value: string|number|boolean|null) {
+    setProducts(current => current.map((product, i) => i === index ? { ...product, [key]: value } : product));
     if (key === 'costPrice') setBasisConfirmed(false);
   }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (calculated === null) { setError('Ingresa el costo neto en CLP para calcular el precio de venta.'); return; }
-    if (product.sourceUrl && !basisConfirmed) { setError('Confirma que revisaste el costo base y el tratamiento del IVA.'); return; }
-    if (calculated > 2_000_000_000) { setError('El precio calculado supera el máximo permitido.'); return; }
+  function selectAll(selectedValue: boolean) { setProducts(current => current.map(product => ({ ...product, selected: selectedValue }))); }
+  function prepared(product: Imported) {
+    const { selected: _selected, ...data } = product;
+    return { ...data, costPrice: data.costPrice && data.costPrice > 0 ? data.costPrice : null, utilityMode, utilityPercent, price: data.costPrice && data.costPrice > 0 ? sellingPrice(data.costPrice, utilityPercent, utilityMode) : 0, active: true };
+  }
+  async function downloadExcel() {
+    if (!selected.length) { setError('Selecciona al menos un producto para exportar.'); return; }
+    setExcelBusy(true); setError('');
+    try {
+      const response = await fetch('/api/catalog/import/excel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: selected.map(prepared) }) });
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'No se pudo generar el Excel.'); }
+      const blob = await response.blob(), objectUrl = URL.createObjectURL(blob), link = document.createElement('a'); link.href = objectUrl; link.download = 'productos-proveedor.xlsx'; link.click(); URL.revokeObjectURL(objectUrl);
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo generar el Excel.'); }
+    finally { setExcelBusy(false); }
+  }
+  async function saveSelected() {
+    if (!selected.length) { setError('Selecciona al menos un producto para guardar.'); return; }
+    if (selectedWithoutCost) { setError(`Completa un costo neto CLP mayor que cero para los ${selectedWithoutCost} productos seleccionados sin costo.`); return; }
+    if (selectedInvalid.length) { setError('Corrige el porcentaje de utilidad o el costo de los productos marcados como inválidos.'); return; }
+    if (!basisConfirmed) { setError('Confirma que revisaste los precios publicados y el costo neto/IVA de los productos seleccionados.'); return; }
     setSaving(true); setError('');
-    try { await onSave({ ...product, costPrice: product.costPrice, utilityPercent, utilityMode, price: calculated, active: true }); onClose(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'No se pudo agregar al catálogo.'); }
+    try {
+      const response = await fetch('/api/catalog/import/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selected.map(prepared)) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudieron guardar los productos.');
+      await onSaved(data.created, data.skipped); onClose();
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudieron guardar los productos.'); }
     finally { setSaving(false); }
   }
 
   return <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section className="modal wide catalog-import-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-import-title">
-    <header className="modal-head"><div><h2 id="catalog-import-title">Importar producto desde proveedor</h2><p>Extrae los datos públicos y revisa el costo antes de guardarlo.</p></div><button type="button" className="modal-close" onClick={onClose}>×</button></header>
-    <form onSubmit={submit}><div className="modal-body">
-      <label className="field">URL pública del producto<div className="import-url-row"><input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://proveedor.cl/producto/..." required/><button type="button" className="button outline" disabled={extracting || !url.trim()} onClick={extractProduct}>{extracting ? 'Extrayendo…' : '↧ Extraer datos'}</button></div></label>
-      <div className="import-source-note">Solo se leen páginas HTTPS públicas. Algunos proveedores bloquean la lectura o cargan productos con JavaScript; si falla, completa los campos manualmente.</div>
-      <div className="form-grid import-product-fields"><label className="field span2">Producto / modelo<input required maxLength={180} value={product.name} onChange={event => update('name', event.target.value)}/></label><label className="field span2">Descripción<textarea maxLength={500} rows={3} value={product.description} onChange={event => update('description', event.target.value)}/></label><label className="field">Categoría<select value={product.category} onChange={event => update('category', event.target.value)}>{['Videovigilancia','Redes','Automatización','Control de acceso','Infraestructura','Servicios','Otros'].map(category => <option key={category}>{category}</option>)}</select></label><label className="field">Unidad<input maxLength={30} value={product.unit} onChange={event => update('unit', event.target.value)}/></label>
-        <label className="field">Costo neto de compra (CLP)<input type="number" min="0" max="2000000000" step="1" value={product.costPrice ?? ''} onChange={event => update('costPrice', event.target.value === '' ? null : Number(event.target.value))} placeholder="Ingresa costo neto en pesos"/><small>Antes de aplicar utilidad. Excluye el IVA recuperable.</small></label>
-        <label className="field">Regla de utilidad<select value={utilityMode} onChange={event => setUtilityMode(event.target.value as UtilityMode)}><option value="MARKUP">Recargo sobre costo</option><option value="MARGIN">Margen sobre precio de venta</option></select></label>
-        <label className="field">Porcentaje (%)<input type="number" min="0" max={utilityMode === 'MARGIN' ? 99 : 1000} step="1" value={utilityPercent} onChange={event => setUtilityPercent(Math.max(0, Number(event.target.value)))}/></label>
-      </div>
-      <section className="import-price-preview"><div><span>Precio origen</span><b>{product.sourcePrice ? `${product.sourcePrice} ${product.sourceCurrency}` : 'No encontrado'}</b><small>{product.sourceUrl ? 'Confirma moneda y si el precio publicado incluye IVA.' : 'Puedes completar el costo manualmente.'}</small></div><span className="import-math">{utilityMode === 'MARKUP' ? `Costo × (1 + ${utilityPercent}%)` : `Costo ÷ (1 − ${utilityPercent}%)`}</span><div className="import-sale-price"><span>Precio de venta sugerido</span><b>{calculated === null ? '—' : money(calculated)}</b></div></section>
-      {product.sourceUrl && <label className="import-confirm"><input type="checkbox" checked={basisConfirmed} onChange={event => setBasisConfirmed(event.target.checked)}/><span>Revisé el precio publicado, lo convertí a costo neto CLP y verifiqué su tratamiento de IVA.</span></label>}
-      {error && <div className="error-box" role="alert">{error}</div>}
-    </div><footer className="modal-foot"><span>El precio del catálogo se calcula también en el servidor.</span><div><button type="button" className="button outline" onClick={onClose}>Cancelar</button><button className="button primary" disabled={saving || !product.name.trim() || calculated === null || (!!product.sourceUrl && !basisConfirmed)}>{saving ? 'Guardando…' : 'Confirmar y agregar'}</button></div></footer></form>
+    <header className="modal-head"><div><h2 id="catalog-import-title">Importar productos desde proveedor</h2><p>Extrae productos de páginas de listado, revísalos, descarga Excel o guárdalos en lote.</p></div><button type="button" className="modal-close" onClick={onClose}>×</button></header>
+    <div className="modal-body catalog-bulk-body">
+      <label className="field">URL pública de la página de productos<div className="import-url-row"><input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://proveedor.cl/categoria/camaras" required/><button type="button" className="button primary" disabled={extracting || !url.trim()} onClick={extractProducts}>{extracting ? 'Extrayendo…' : '↧ Extraer productos'}</button></div></label>
+      <div className="import-source-note">Solo se consultan páginas HTTPS públicas. La extracción lee HTML, datos estructurados y tarjetas de productos; páginas que renderizan el catálogo únicamente con JavaScript podrían requerir carga manual. Límite de 500 productos por página.</div>
+      {products.length > 0 && <>
+        <div className="bulk-toolbar"><div><b>{selected.length} de {products.length} seleccionados</b><span>Los precios publicados se conservan como referencia. Ingresa y verifica el costo neto en CLP.</span></div><div><button type="button" className="button outline compact" onClick={() => selectAll(true)}>Seleccionar todos</button><button type="button" className="button outline compact" onClick={() => selectAll(false)}>Ninguno</button></div></div>
+        <div className="bulk-utility form-grid"><label className="field">Regla de utilidad<select value={utilityMode} onChange={event => setUtilityMode(event.target.value as UtilityMode)}><option value="MARKUP">Recargo sobre costo</option><option value="MARGIN">Margen sobre precio de venta</option></select></label><label className="field">Porcentaje (%)<input type="number" min="0" max={utilityMode === 'MARGIN' ? 99 : 1000} step="1" value={utilityPercent} onChange={event => setUtilityPercent(Math.max(0, Number(event.target.value)))}/></label><div className="bulk-formula"><b>{utilityMode === 'MARKUP' ? `Costo × (1 + ${utilityPercent}%)` : `Costo ÷ (1 − ${utilityPercent}%)`}</b><span>El catálogo calcula el precio de venta sugerido con esta regla.</span></div></div>
+        <div className="bulk-table-wrap"><table className="bulk-product-table"><thead><tr><th>✓</th><th>Producto</th><th>Marca / SKU</th><th>Costo neto CLP</th><th>Precio de origen</th><th>Venta sugerida</th><th>Unidad / categoría</th></tr></thead><tbody>{products.map((product, index) => {
+          const suggested = product.costPrice && product.costPrice > 0 ? sellingPrice(product.costPrice, utilityPercent, utilityMode) : null;
+          return <tr key={`${product.sourceUrl}-${index}`} className={!product.selected ? 'unselected' : ''}><td><input aria-label={`Seleccionar ${product.name}`} type="checkbox" checked={product.selected} onChange={event => update(index, 'selected', event.target.checked)}/></td><td className="bulk-name-cell"><input className="bulk-text" value={product.name} maxLength={180} onChange={event => update(index, 'name', event.target.value)}/><textarea className="bulk-text bulk-description" value={product.description} maxLength={500} placeholder="Descripción" onChange={event => update(index, 'description', event.target.value)}/><a href={product.sourceUrl} target="_blank" rel="noreferrer">Ver fuente ↗</a>{product.availability&&<small>{product.availability}</small>}</td><td><input className="bulk-text" value={product.brand} placeholder="Marca" maxLength={120} onChange={event => update(index, 'brand', event.target.value)}/><input className="bulk-text" value={product.sku} placeholder="SKU / modelo" maxLength={100} onChange={event => update(index, 'sku', event.target.value)}/></td><td><input className="bulk-number" type="number" min="0" max="2000000000" step="1" value={product.costPrice??''} placeholder="Revisar" onChange={event => update(index, 'costPrice', event.target.value === '' ? null : Number(event.target.value))}/><small>CLP neto</small></td><td>{product.sourcePrice ? <><b>{product.sourcePrice} {product.sourceCurrency}</b><small>Dato publicado</small></> : <span className="muted">No detectado</span>}</td><td><b>{suggested ? money(suggested) : '—'}</b><small>{suggested ? `${utilityMode === 'MARKUP' ? 'Recargo' : 'Margen'} ${utilityPercent}%` : 'Ingresa costo neto'}</small></td><td><input className="bulk-text" value={product.unit} maxLength={30} onChange={event => update(index, 'unit', event.target.value)}/><select className="bulk-select" value={categories.includes(product.category) ? product.category : 'Otros'} onChange={event => update(index, 'category', event.target.value)}>{categories.map(category => <option key={category}>{category}</option>)}</select></td></tr>;
+        })}</tbody></table></div>
+        {truncated&&<div className="import-source-note">La página contenía más de 500 productos. Se muestran los primeros 500.</div>}
+        <label className="import-confirm"><input type="checkbox" checked={basisConfirmed} onChange={event => setBasisConfirmed(event.target.checked)}/><span>Revisé los precios publicados, confirmé el costo neto en CLP y verifiqué el tratamiento de IVA para los productos que voy a guardar.</span></label>
+      </>}
+      {notice&&<div className="success-box" role="status">{notice}</div>}{error&&<div className="error-box" role="alert">{error}</div>}
+    </div>
+    <footer className="modal-foot"><span>El Excel incluye productos seleccionados, fuentes y precios de referencia.</span><div><button type="button" className="button outline" onClick={onClose}>Cancelar</button>{products.length>0&&<><button type="button" className="button outline" disabled={excelBusy||!selected.length} onClick={downloadExcel}>{excelBusy?'Generando…':'⇩ Descargar Excel'}</button><button type="button" className="button primary" disabled={saving||!selected.length||!basisConfirmed} onClick={saveSelected}>{saving?'Guardando…':`Guardar ${selected.length} en catálogo`}</button></>}</div></footer>
   </section></div>;
 }

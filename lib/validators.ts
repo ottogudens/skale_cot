@@ -3,10 +3,10 @@ import { sellingPrice } from '@/lib/pricing';
 export const clientSchema = z.object({ name: z.string().trim().min(1).max(180), rut: z.string().max(30).default(''), email: z.string().max(180).default(''), phone: z.string().max(60).default(''), address: z.string().max(250).default(''), contact: z.string().max(160).default(''), notes: z.string().max(2000).default('') });
 const MAX_CATALOG_PRICE = 2_000_000_000;
 export const catalogSchema = z.object({
-  name: z.string().trim().min(1).max(180), description: z.string().max(500).default(''), category: z.string().max(80).default('Otros'), unit: z.string().max(30).default('un'),
+  name: z.string().trim().min(1).max(180), brand: z.string().max(120).default(''), sku: z.string().max(100).default(''), description: z.string().max(500).default(''), category: z.string().max(80).default('Otros'), unit: z.string().max(30).default('un'),
   price: z.coerce.number().int().min(0).max(MAX_CATALOG_PRICE), costPrice: z.coerce.number().int().min(0).max(MAX_CATALOG_PRICE).nullable().optional().default(null),
   utilityPercent: z.coerce.number().int().min(0).max(1000).default(0), utilityMode: z.enum(['MARKUP','MARGIN']).default('MARKUP'),
-  sourceUrl: z.string().max(2048).default(''), sourceCurrency: z.string().max(12).default('CLP'), sourcePrice: z.string().max(100).default(''), sourceCheckedAt: z.coerce.date().nullable().optional().default(null),
+  sourceUrl: z.string().max(2048).default(''), sourceCurrency: z.string().max(12).default('CLP'), sourcePrice: z.string().max(100).default(''), sourceCheckedAt: z.coerce.date().nullable().optional().default(null), availability: z.string().max(80).default(''), imageUrl: z.string().max(2048).default(''),
   active: z.boolean().default(true),
 }).superRefine((item, ctx) => {
   if (item.utilityMode === 'MARGIN' && item.utilityPercent >= 100) ctx.addIssue({ code: 'custom', path: ['utilityPercent'], message: 'El margen debe ser inferior al 100%.' });
@@ -14,6 +14,7 @@ export const catalogSchema = z.object({
     try { if (new URL(item.sourceUrl).protocol !== 'https:') ctx.addIssue({ code: 'custom', path: ['sourceUrl'], message: 'La URL de origen debe usar HTTPS.' }); }
     catch { ctx.addIssue({ code: 'custom', path: ['sourceUrl'], message: 'La URL de origen no es válida.' }); }
   }
+  if (item.imageUrl) { try { if (new URL(item.imageUrl).protocol !== 'https:') ctx.addIssue({ code: 'custom', path: ['imageUrl'], message: 'La imagen debe usar HTTPS.' }); } catch { ctx.addIssue({ code: 'custom', path: ['imageUrl'], message: 'La URL de imagen no es válida.' }); } }
   if (item.costPrice !== null) {
     const suggested = sellingPrice(item.costPrice, item.utilityPercent, item.utilityMode);
     if (!Number.isFinite(suggested) || Math.round(suggested) > MAX_CATALOG_PRICE) ctx.addIssue({ code: 'custom', path: ['utilityPercent'], message: 'El precio calculado supera el máximo permitido para el catálogo.' });

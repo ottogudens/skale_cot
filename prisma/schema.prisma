@@ -33,6 +33,8 @@ model Client {
 model CatalogItem {
   id               String    @id @default(cuid())
   name             String
+  brand            String    @default("")
+  sku              String    @default("")
   description      String    @default("")
   category         String    @default("Otros")
   unit             String    @default("un")
@@ -44,6 +46,8 @@ model CatalogItem {
   sourceCurrency   String    @default("CLP")
   sourcePrice      String    @default("")
   sourceCheckedAt  DateTime?
+  availability     String    @default("")
+  imageUrl         String    @default("")
   active           Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
