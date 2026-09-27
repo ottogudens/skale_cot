@@ -31,15 +31,22 @@ model Client {
 }
 
 model CatalogItem {
-  id          String   @id @default(cuid())
-  name        String
-  description String   @default("")
-  category    String   @default("Otros")
-  unit        String   @default("un")
-  price       Int
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  description      String    @default("")
+  category         String    @default("Otros")
+  unit             String    @default("un")
+  price            Int
+  costPrice        Int?
+  utilityPercent   Int       @default(0)
+  utilityMode      String    @default("MARKUP")
+  sourceUrl        String    @default("")
+  sourceCurrency   String    @default("CLP")
+  sourcePrice      String    @default("")
+  sourceCheckedAt  DateTime?
+  active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Quote {

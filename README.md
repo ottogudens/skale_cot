@@ -11,6 +11,7 @@ Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, 
 - Clientes y catálogo reutilizable de equipos y servicios.
 - Configuración del nombre comercial, datos de empresa, logo, IVA, validez predeterminada y términos.
 - Asistente de terreno con dictado en español, borrador conversacional de cotización, propuestas de clientes y equipos/servicios, y confirmación antes de guardar.
+- Importación de productos desde páginas públicas HTTPS, con conservación de la fuente, costo neto CLP y cálculo de precio mediante recargo o margen.
 - PostgreSQL con Prisma y migración versionada.
 
 ## Requisitos
@@ -70,6 +71,8 @@ Sube el contenido de esta carpeta como raíz del repositorio. No incluyas `.env`
 Vercel no necesita `ADMIN_EMAIL` ni `ADMIN_PASSWORD` en runtime; solo se usan al crear el usuario inicial mediante seed. No pongas esas credenciales en variables Preview conectadas a la base de producción.
 
 El asistente envía a OpenAI el texto de la conversación y los datos de clientes/catálogo necesarios para preparar sugerencias. La aplicación no guarda cambios por el agente sin confirmación explícita. El dictado usa el reconocimiento de voz disponible en navegadores compatibles; el navegador solicitará permiso de micrófono.
+
+Desde **Catálogo → Importar desde proveedor**, pega una URL pública del producto y extrae los metadatos estructurados o etiquetas Open Graph de la página. Revisa el costo en CLP y su tratamiento de IVA: el precio de origen puede estar en otra moneda o incluir impuestos, así que el sistema no asume conversiones ni trata el precio publicado como costo neto sin tu confirmación. El precio sugerido usa una de dos reglas: **recargo sobre costo** (`costo × (1 + porcentaje)`) o **margen sobre venta** (`costo ÷ (1 − porcentaje)`). La utilidad queda separada del IVA de la cotización. La fuente y fecha de consulta se guardan en el catálogo. La importación no ejecuta JavaScript, no inicia sesión en proveedores ni sortea protecciones; si un sitio bloquea la lectura, los datos se pueden completar manualmente.
 
 ## Operación y copias de seguridad
 
