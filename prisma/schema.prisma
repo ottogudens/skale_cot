@@ -117,8 +117,8 @@ model QuoteItem {
 
 model Settings {
   id              String   @id @default("singleton")
-  companyName     String   @default("Nexo Ingeniería")
-  companyTagline  String   @default("Redes · Telecomunicaciones · Automatización")
+  companyName     String   @default("SKALIO")
+  companyTagline  String   @default("Cotizaciones que avanzan")
   rut             String   @default("")
   email           String   @default("")
   phone           String   @default("")

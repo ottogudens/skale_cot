@@ -1,4 +1,4 @@
-# Nexo · Cotizaciones técnicas
+# SKALIO · Cotizaciones que avanzan
 
 Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, control de acceso y automatización. Interfaz en español, valores en pesos chilenos, IVA configurable, PDF imprimible tamaño A4 y persistencia en PostgreSQL.
 
