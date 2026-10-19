@@ -1,6 +1,12 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+// The app uses .env.local during local development; keep .env as a fallback
+// for terminals and CI environments that only provide that file.
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+
 const prisma = new PrismaClient();
 
 async function main() {
