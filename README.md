@@ -17,18 +17,17 @@ Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, 
 ## Requisitos
 
 - Node.js 20.9 o posterior (Next.js 16 requiere Node 20.9+; el proyecto recomienda Node 22 LTS).
-- Una base PostgreSQL. Railway puede alojarla.
+- Un proyecto Supabase PostgreSQL.
 - Una cuenta GitHub y un proyecto Vercel para el despliegue.
 
 ## Ejecutar localmente
 
-1. Duplica `.env.example` como `.env` y completa `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Para el asistente, añade una clave de OpenAI en `OPENAI_API_KEY`. Usa una contraseña de al menos 12 caracteres y un secreto aleatorio largo para `AUTH_SECRET`.
+1. Duplica `.env.example` como `.env` y completa `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Para el asistente, añade una clave de OpenAI en `OPENAI_API_KEY`. Usa una contraseña de al menos 12 caracteres y un secreto aleatorio largo para `AUTH_SECRET`.
 2. Instala dependencias y prepara la base:
 
    ```bash
    npm install
-   npx prisma migrate deploy
-   npm run db:seed
+   npm run db:setup
    npm run dev
    ```
 
@@ -36,24 +35,26 @@ Aplicación web para crear presupuestos de proyectos de redes, videovigilancia, 
 
 `npm run db:seed` crea el administrador inicial, la configuración de empresa y un catálogo de ejemplo. Es idempotente: no reemplaza la contraseña de un usuario existente ni duplica los ítems si el catálogo ya está poblado. Cambia la marca, logo, datos de empresa y catálogo de ejemplo desde la aplicación.
 
-## Desplegar PostgreSQL en Railway y la app en Vercel
+## Desplegar Supabase PostgreSQL y la app en Vercel
 
 ### 1. Subir el repositorio a GitHub
 
 Sube el contenido de esta carpeta como raíz del repositorio. No incluyas `.env` ni pegues secretos en Git. El archivo `.gitignore` ya excluye variables y dependencias.
 
-### 2. Crear la base PostgreSQL en Railway
+### 2. Crear la base PostgreSQL en Supabase
 
-1. En Railway, crea un proyecto y añade el plugin **PostgreSQL**.
-2. Abre las variables del servicio PostgreSQL y copia `DATABASE_PUBLIC_URL` (o la URL pública que Railway muestre para conexiones externas). La aplicación alojada en Vercel necesita una dirección accesible desde fuera de Railway. Conserva `sslmode=require` si está presente; si no, añádelo a la URL. Opcionalmente limita conexiones con `?connection_limit=5`.
-3. Ejecuta la migración y el seed contra esa base desde un terminal en esta carpeta:
+1. Crea un proyecto Supabase nuevo y vacío en la región más cercana a tus usuarios.
+2. En el editor SQL crea un usuario de base de datos exclusivo para Prisma y entrégale permisos sobre el esquema `public`, siguiendo la guía oficial de Supabase para Prisma. No uses la clave `anon` ni la clave `service_role` en esta aplicación.
+3. En **Connect**, copia las dos cadenas del pooler Supavisor para ese usuario:
+   - La de **Transaction mode**, puerto `6543`, como `DATABASE_URL`.
+   - La de **Session mode**, puerto `5432`, como `DIRECT_URL`.
+4. Ejecuta las migraciones y el seed contra la base nueva desde un terminal en esta carpeta:
 
    ```bash
-   DATABASE_URL='URL_PUBLICA_DE_RAILWAY' npx prisma migrate deploy
-   DATABASE_URL='URL_PUBLICA_DE_RAILWAY' ADMIN_EMAIL='tu-correo@empresa.cl' ADMIN_PASSWORD='una-clave-larga-de-12-caracteres-o-mas' npx tsx prisma/seed.ts
+   npm run db:setup
    ```
 
-   Usa una contraseña única y guarda la URL y la contraseña en un gestor seguro. Las comillas simples evitan que caracteres especiales se interpreten en el terminal.
+   Esto crea una base desde cero: un administrador inicial, la configuración de empresa y los ejemplos de catálogo. No transfiere datos de Railway.
 
 ### 3. Desplegar en Vercel
 
@@ -61,11 +62,12 @@ Sube el contenido de esta carpeta como raíz del repositorio. No incluyas `.env`
 2. Si este proyecto está dentro de otro repositorio, establece **Root Directory** en `outputs/nexo-presupuestos`; si subiste esta carpeta como raíz, déjalo en `./`.
 3. Añade estas variables en **Project → Settings → Environment Variables** para Production (y Preview si quieres entornos de prueba separados):
 
-   - `DATABASE_URL`: URL pública de Railway con `sslmode=require` y, para cargas pequeñas, `connection_limit=5`.
+   - `DATABASE_URL`: URL del pooler de Supabase en modo Transaction, puerto `6543`.
+   - `DIRECT_URL`: URL del pooler de Supabase en modo Session, puerto `5432`.
    - `AUTH_SECRET`: una cadena aleatoria de al menos 32 caracteres. Puedes generar una con `openssl rand -base64 48`.
    - `OPENAI_API_KEY`: clave secreta de OpenAI API (requerida para el asistente de terreno).
 
-4. Despliega. `vercel.json` hace que cada build aplique primero las migraciones (`prisma migrate deploy`) y luego compile Next.js.
+4. Despliega. El build solo compila la aplicación; las migraciones se ejecutan deliberadamente antes de publicar, no en cada build de Vercel.
 5. Abre el dominio de Vercel e inicia sesión con el usuario creado en el paso del seed.
 
 Vercel no necesita `ADMIN_EMAIL` ni `ADMIN_PASSWORD` en runtime; solo se usan al crear el usuario inicial mediante seed. No pongas esas credenciales en variables Preview conectadas a la base de producción.
@@ -80,11 +82,11 @@ El menú **Servicios** mantiene un catálogo separado para mano de obra y servic
 
 El tratamiento de IVA se configura por servicio y línea de cotización. Los servicios se crean afectos por defecto y se puede marcar “Exento/no afecto” si la operación califica. Desde 2023 el SII indica que los servicios están gravados como regla general, salvo que aplique una exención legal; la mano de obra por sí sola no determina la exención.
 
-## Operación y copias de seguridad
+## Operación de la base de datos
 
-- Toma copias de seguridad desde Railway antes de cambios importantes de esquema y configura su política de backups según tu plan.
-- Para cambios futuros de Prisma, crea una migración con `npx prisma migrate dev --name descripcion` contra una base local de desarrollo y versiona `prisma/migrations/`. En producción se aplicará con el siguiente despliegue.
-- Para que Vercel Preview no modifique producción, crea otra base de Railway para Preview.
+- Para cambios futuros de Prisma, crea una migración con `npx prisma migrate dev --name descripcion` contra una base local de desarrollo y versiona `prisma/migrations/`. Antes de publicar, aplica esa migración a Supabase con `npx prisma migrate deploy` usando `DIRECT_URL`.
+- Para que Vercel Preview no modifique producción, crea otro proyecto Supabase o una base de prueba independiente y configura sus variables solo en Preview.
+- Si la app solo accede mediante Prisma, desactiva la Data API de Supabase. Las credenciales de base de datos deben vivir únicamente en las variables de servidor de Vercel.
 - La descarga PDF utiliza el diálogo de impresión del navegador: selecciona **Guardar como PDF**. En móvil, puede depender de las opciones de impresión/compartir del sistema.
 
 ## Estructura

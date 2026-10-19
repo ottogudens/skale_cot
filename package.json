@@ -12,6 +12,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
+    "db:setup": "npm run db:migrate && npm run db:seed",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
