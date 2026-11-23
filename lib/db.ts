@@ -7,6 +7,13 @@ const connectionString = databaseUrl();
 
 if (!connectionString) throw new Error('DATABASE_URL no está configurada');
 
-const adapter = new PrismaPg({ connectionString });
+// Hyperdrive limits this origin to a small, shared number of upstream
+// connections. A default pg pool can open several connections per Worker
+// isolate, exhausting that limit when the dashboard loads its resources.
+const adapter = new PrismaPg({
+  connectionString,
+  max: 1,
+  idleTimeoutMillis: 5_000,
+});
 export const db = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;

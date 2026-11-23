@@ -29,7 +29,18 @@ function App(){
  const [assistantOpen,setAssistantOpen]=useState(false);
  const [catalogImportOpen,setCatalogImportOpen]=useState(false),[catalogCategoriesOpen,setCatalogCategoriesOpen]=useState(false);
  const notify=(s:string)=>{setToast(s);window.setTimeout(()=>setToast(''),3200)};
- const load=useCallback(async()=>{setBusy(true);try{const [q,c,p,sv,s,cats]=await Promise.all([api<Quote[]>('/api/quotes'),api<Client[]>('/api/clients'),api<Product[]>('/api/catalog'),api<Service[]>('/api/services'),api<Settings>('/api/settings'),api<CatalogCategory[]>('/api/catalog/categories')]);setQuotes(q);setClients(c);setProducts(p);setServices(sv);setSettings(s);setCategories(cats)}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setBusy(false)}},[]);
+ const load=useCallback(async()=>{setBusy(true);try{
+  // Keep the first dashboard hydration within Hyperdrive's small upstream
+  // connection budget. Each result is independent, so ordered loading is
+  // preferable to failing the entire workspace under a cold start.
+  const q=await api<Quote[]>('/api/quotes');
+  const c=await api<Client[]>('/api/clients');
+  const p=await api<Product[]>('/api/catalog');
+  const sv=await api<Service[]>('/api/services');
+  const s=await api<Settings>('/api/settings');
+  const cats=await api<CatalogCategory[]>('/api/catalog/categories');
+  setQuotes(q);setClients(c);setProducts(p);setServices(sv);setSettings(s);setCategories(cats)
+ }catch(e){setError(e instanceof Error?e.message:'Error')}finally{setBusy(false)}},[]);
  useEffect(()=>{api<User>('/api/auth/me').then(setUser).catch(()=>setUser(null)).finally(()=>setLoading(false))},[]);
  useEffect(()=>{if(user)load()},[user,load]);
  async function login(e:React.FormEvent){e.preventDefault();setError('');setLoginBusy(true);try{setUser(await api<User>('/api/auth/login',{method:'POST',body:JSON.stringify({email,password})}))}catch(e){setError(e instanceof Error?e.message:'Error de acceso')}finally{setLoginBusy(false)}}
