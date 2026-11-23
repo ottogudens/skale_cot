@@ -3,6 +3,7 @@ import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { ApiError, api } from '@/lib/http';
+import { runtimeEnv } from '@/lib/runtime-env';
 
 const assistantOutput = z.object({
   reply: z.string().describe('Respuesta breve y conversacional en español chileno, con preguntas técnicas útiles si falta información.'),
@@ -18,7 +19,7 @@ const requestSchema = z.object({
 
 export async function POST(req: Request) {
   return api(async () => {
-    if (!process.env.OPENAI_API_KEY) throw new ApiError('Falta configurar OPENAI_API_KEY en el entorno del servidor.', 503);
+    if (!runtimeEnv('OPENAI_API_KEY')) throw new ApiError('Falta configurar OPENAI_API_KEY en el entorno del servidor.', 503);
     const { messages, draft } = requestSchema.parse(await req.json());
     const [clients, items, settings] = await Promise.all([
       db.client.findMany({ take: 60, orderBy: { name: 'asc' }, select: { name: true, rut: true, email: true, phone: true, address: true, contact: true } }),

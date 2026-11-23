@@ -3,6 +3,7 @@ import { ApiError, api } from '@/lib/http';
 import { z } from 'zod';
 
 const categorySchema = z.object({ name: z.string().trim().min(1).max(80) });
+const yieldToRuntime = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 export const GET = () => api(async () => {
   const [saved, usedProducts, usedServices] = await Promise.all([
@@ -19,8 +20,14 @@ export const GET = () => api(async () => {
 export async function POST(req: Request) {
   return api(async () => {
     const { name } = categorySchema.parse(await req.json());
-    const duplicate = await db.catalogCategory.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
-    if (duplicate) throw new ApiError('Ya existe una categoría con ese nombre.', 409);
-    return db.catalogCategory.create({ data: { name } });
+    const saved = await db.catalogCategory.findMany({ select: { id: true, name: true } });
+    await yieldToRuntime();
+    if (saved.some(category => category.name.localeCompare(name, 'es-CL', { sensitivity: 'accent' }) === 0)) throw new ApiError('Ya existe una categoría con ese nombre.', 409);
+    const created = await db.catalogCategory.create({ data: { id: crypto.randomUUID(), name } });
+    await yieldToRuntime();
+    const persisted = await db.catalogCategory.findUnique({ where: { id: created.id } });
+    await yieldToRuntime();
+    if (!persisted) throw new ApiError('La categoría no se pudo confirmar en la base de datos.', 500);
+    return persisted;
   }, 201);
 }

@@ -79,7 +79,7 @@ function productFromObject(item: Record<string, any>, sourceUrl: string, fallbac
   return {
     name: clean(item.name ?? fallback.name ?? '', 180), brand: clean(brand ?? '', 120), sku: clean(item.sku ?? item.mpn ?? item.productID ?? '', 100),
     description: descriptions.join(' · '), category: clean(item.category ?? 'Otros', 80), unit: 'un', costPrice: Number.isSafeInteger(cost) && cost! > 0 ? cost : null,
-    sourceUrl: urlOf(item.url ?? item['@id'], sourceUrl) || sourceUrl, sourceCurrency: currency, sourcePrice: rawPrice,
+    sourceUrl: urlOf(item.url ?? item['@id'], sourceUrl) || sourceUrl, sourceCurrency: currency, sourcePrice: rawPrice, sourcePriceTaxType: 'UNKNOWN',
     sourceCheckedAt: new Date().toISOString(), availability, imageUrl: image,
   };
 }
@@ -119,7 +119,7 @@ function extract(html: string, pageUrl: string) {
       const costPrice = currency === 'CLP' && digits ? Number(digits) : null;
       const imageSrc = card.find('img').first().attr('src') || card.find('img').first().attr('data-src') || '';
       const productUrl = urlOf(link.attr('href'), pageUrl);
-      candidates.push({ name: clean(name, 180), brand: '', sku: clean(card.attr('data-product-id') || '', 100), description: clean(card.find('[class*="description"]').first().text(), 350), category: 'Otros', unit: 'un', costPrice: Number.isSafeInteger(costPrice) && costPrice! > 0 ? costPrice : null, sourceUrl: productUrl || pageUrl, sourceCurrency: currency, sourcePrice: raw, sourceCheckedAt: new Date().toISOString(), availability: /agotado|sin stock|out of stock/i.test(card.text()) ? 'OutOfStock' : '', imageUrl: urlOf(imageSrc, pageUrl) });
+      candidates.push({ name: clean(name, 180), brand: '', sku: clean(card.attr('data-product-id') || '', 100), description: clean(card.find('[class*="description"]').first().text(), 350), category: 'Otros', unit: 'un', costPrice: Number.isSafeInteger(costPrice) && costPrice! > 0 ? costPrice : null, sourceUrl: productUrl || pageUrl, sourceCurrency: currency, sourcePrice: raw, sourcePriceTaxType: 'UNKNOWN', sourceCheckedAt: new Date().toISOString(), availability: /agotado|sin stock|out of stock/i.test(card.text()) ? 'OutOfStock' : '', imageUrl: urlOf(imageSrc, pageUrl) });
     });
   }
   if (!candidates.length) {

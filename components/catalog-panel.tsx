@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 
-export type CatalogProduct = { id: string; name: string; brand: string; sku: string; description: string; category: string; unit: string; price: number; costPrice: number|null; utilityPercent: number; utilityMode: 'MARKUP'|'MARGIN'; sourceUrl: string; sourceCurrency: string; sourcePrice: string; sourceCheckedAt: string|null; availability: string; imageUrl: string; active: boolean };
+export type CatalogProduct = { id: string; name: string; brand: string; sku: string; description: string; category: string; unit: string; price: number; costPrice: number|null; utilityPercent: number; utilityMode: 'MARKUP'|'MARGIN'; sourceUrl: string; sourceCurrency: string; sourcePrice: string; sourcePriceTaxType: 'UNKNOWN'|'NET'|'GROSS'; sourceCheckedAt: string|null; availability: string; imageUrl: string; active: boolean };
 export type CatalogCategory = { id: string; name: string; custom: boolean };
 const money = (value: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value || 0);
 const dateShort = (date?: string|null) => date ? new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(date)) : '—';
@@ -11,7 +11,7 @@ export function CatalogPanel({ products, categories, onAdd, onEdit, onDelete, on
   products: CatalogProduct[]; categories: CatalogCategory[]; onAdd: () => void; onEdit: (product: CatalogProduct) => void; onDelete: (product: CatalogProduct) => void;
   onImportSupplier: () => void; onManageCategories: () => void; onImported: (imported: number, skipped: number) => Promise<void>;
 }) {
-  const [query, setQuery] = useState(''), [category, setCategory] = useState('TODAS'), [sort, setSort] = useState('name'), [view, setView] = useState<'cards'|'list'>('list');
+  const [query, setQuery] = useState(''), [category, setCategory] = useState('TODAS'), [sort, setSort] = useState('name'), [view, setView] = useState<'cards'|'list'>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'cards' : 'list');
   const [uploading, setUploading] = useState(false), [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const filtered = useMemo(() => {

@@ -2,6 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { ApiError, api } from '@/lib/http';
+import { runtimeEnv } from '@/lib/runtime-env';
 
 const requestSchema = z.object({ name: z.string().trim().min(3).max(180), category: z.string().max(80).default('Servicios técnicos'), details: z.string().max(1200).default('') });
 const researchOutput = z.object({
@@ -11,7 +12,7 @@ const researchOutput = z.object({
 
 export async function POST(req: Request) {
   return api(async () => {
-    if (!process.env.OPENAI_API_KEY) throw new ApiError('Falta configurar OPENAI_API_KEY en el servidor.', 503);
+    if (!runtimeEnv('OPENAI_API_KEY')) throw new ApiError('Falta configurar OPENAI_API_KEY en el servidor.', 503);
     const { name, category, details } = requestSchema.parse(await req.json());
     const result = await generateText({
       model: openai.responses('gpt-4o-mini'),
