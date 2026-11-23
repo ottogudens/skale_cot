@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireUser } from '@/lib/auth';
+import { withDb } from '@/lib/db';
 export class ApiError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 export async function api<T>(work: () => Promise<T>, status = 200) {
-  try { await requireUser(); return NextResponse.json(await work(), { status }); }
+  try { await requireUser(); return NextResponse.json(await withDb(work), { status }); }
   catch (e) {
     if (e instanceof Error && e.message === 'UNAUTHORIZED') return NextResponse.json({ error: 'Sesión no válida.' }, { status: 401 });
     if (e instanceof ApiError) return NextResponse.json({ error: e.message }, { status: e.status });

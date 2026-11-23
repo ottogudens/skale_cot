@@ -1,19 +1,40 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { databaseUrl } from '@/lib/runtime-env';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-const connectionString = databaseUrl();
+const requestDb = new AsyncLocalStorage<PrismaClient>();
 
-if (!connectionString) throw new Error('DATABASE_URL no está configurada');
+function createDb() {
+  const connectionString = databaseUrl();
+  if (!connectionString) throw new Error('DATABASE_URL no está configurada');
 
-// Hyperdrive limits this origin to a small, shared number of upstream
-// connections. A default pg pool can open several connections per Worker
-// isolate, exhausting that limit when the dashboard loads its resources.
-const adapter = new PrismaPg({
-  connectionString,
-  max: 1,
-  idleTimeoutMillis: 5_000,
+  return new PrismaClient({
+    adapter: new PrismaPg({ connectionString }),
+  });
+}
+
+// Hyperdrive owns the connection pool. Workers cannot reuse a socket created
+// during one request in a later request, so each API operation receives and
+// closes its own Prisma client.
+export async function withDb<T>(work: () => Promise<T>) {
+  const client = createDb();
+  return requestDb.run(client, async () => {
+    try {
+      return await work();
+    } finally {
+      await client.$disconnect();
+    }
+  });
+}
+
+// Existing route modules keep their concise `db.model.method()` syntax while
+// resolving to the client associated with the current request.
+export const db = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = requestDb.getStore();
+    if (!client) throw new Error('La base de datos debe usarse dentro de una solicitud API.');
+    const value = Reflect.get(client, property, client);
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
 });
-export const db = globalForPrisma.prisma ?? new PrismaClient({ adapter });
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
