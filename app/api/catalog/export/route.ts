@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, withDb } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { createProductWorkbook } from '@/lib/product-workbook';
 
@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export async function GET() {
   try {
     await requireUser();
-    const items = await db.catalogItem.findMany({ orderBy: [{ category: 'asc' }, { name: 'asc' }] });
+    const items = await withDb(() => db.catalogItem.findMany({ orderBy: [{ category: 'asc' }, { name: 'asc' }] }));
     const workbook = createProductWorkbook(items.map(item => ({
       id: item.id, name: item.name, brand: item.brand, sku: item.sku, description: item.description, category: item.category, unit: item.unit,
       sourcePrice: item.sourcePrice, sourceCurrency: item.sourceCurrency, costPrice: item.costPrice, utilityMode: item.utilityMode === 'MARGIN' ? 'MARGIN' : 'MARKUP', utilityPercent: item.utilityPercent,
