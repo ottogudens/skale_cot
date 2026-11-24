@@ -102,8 +102,45 @@ model Quote {
   userId      String
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items       QuoteItem[]
+  annexes     QuoteAnnex[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model QuoteAnnex {
+  id           String   @id @default(cuid())
+  quoteId      String
+  quote        Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  title        String   @default("Anexo técnico explicativo")
+  projectBrief String   @default("")
+  content      String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  items        QuoteAnnexItem[]
+  assets       QuoteAnnexAsset[]
+}
+
+model QuoteAnnexItem {
+  id          String     @id @default(cuid())
+  annexId     String
+  annex       QuoteAnnex @relation(fields: [annexId], references: [id], onDelete: Cascade)
+  quoteItemId String?
+  name        String
+  imageUrl    String     @default("")
+  description String     @default("")
+  specs       String     @default("")
+  position    Int        @default(0)
+}
+
+model QuoteAnnexAsset {
+  id        String     @id @default(cuid())
+  annexId   String
+  annex     QuoteAnnex @relation(fields: [annexId], references: [id], onDelete: Cascade)
+  kind      String     @default("REFERENCE")
+  title     String
+  url       String     @default("")
+  caption   String     @default("")
+  createdAt DateTime   @default(now())
 }
 
 model QuoteItem {
