@@ -39,6 +39,18 @@ export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; 
     setBasisConfirmed(false);
   }
   function selectAll(selectedValue: boolean) { setProducts(current => current.map(product => ({ ...product, selected: selectedValue }))); }
+  function applySourceTaxTypeToSelected(sourcePriceTaxType: Extract<SourcePriceTaxType, 'NET'|'GROSS'>) {
+    let updated = 0;
+    setProducts(current => current.map(product => {
+      if (!product.selected || !product.sourcePrice) return product;
+      const publishedClp = product.sourceCurrency.toUpperCase() === 'CLP' ? clpPriceFromText(product.sourcePrice) : null;
+      const costPrice = sourcePriceTaxType === 'GROSS' && publishedClp !== null ? netPriceFromGross(publishedClp) : sourcePriceTaxType === 'NET' && publishedClp !== null ? publishedClp : product.costPrice;
+      updated += 1;
+      return { ...product, sourcePriceTaxType, costPrice };
+    }));
+    setBasisConfirmed(false);
+    setNotice(updated ? `${updated} productos seleccionados quedaron marcados como precio ${sourcePriceTaxType === 'NET' ? 'neto' : 'final con IVA'}.` : 'No hay productos seleccionados con precio de origen para actualizar.');
+  }
   function applyCategoryToSelected() { const value = bulkCategory.trim(); if (!value) return; setProducts(current => current.map(product => product.selected ? { ...product, category: value } : product)); setBulkCategory(''); }
   function prepared(product: Imported) {
     const { selected: _selected, ...data } = product;
@@ -74,7 +86,7 @@ export function CatalogImportModal({ onClose, onSaved }: { onClose: () => void; 
       <label className="field">URL pública de la página de productos<div className="import-url-row"><input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://proveedor.cl/categoria/camaras" required/><button type="button" className="button primary" disabled={extracting || !url.trim()} onClick={extractProducts}>{extracting ? 'Extrayendo…' : '↧ Extraer productos'}</button></div></label>
       <div className="import-source-note">Solo se consultan páginas HTTPS públicas. La extracción lee HTML, datos estructurados y tarjetas de productos; páginas que renderizan el catálogo únicamente con JavaScript podrían requerir carga manual. Límite de 500 productos por página.</div>
       {products.length > 0 && <>
-        <div className="bulk-toolbar"><div><b>{selected.length} de {products.length} seleccionados</b><span>Marca cada precio publicado como neto o final; si es final, se descuenta automáticamente el IVA de 19% para obtener el costo neto.</span></div><div><button type="button" className="button outline compact" onClick={() => selectAll(true)}>Seleccionar todos</button><button type="button" className="button outline compact" onClick={() => selectAll(false)}>Ninguno</button></div></div>
+        <div className="bulk-toolbar"><div><b>{selected.length} de {products.length} seleccionados</b><span>Marca cada precio publicado como neto o final; si es final, se descuenta automáticamente el IVA de 19% para obtener el costo neto.</span></div><div className="bulk-toolbar-actions"><button type="button" className="button outline compact" onClick={() => selectAll(true)}>Seleccionar todos</button><button type="button" className="button outline compact" onClick={() => selectAll(false)}>Ninguno</button><button type="button" className="button outline compact" disabled={!selected.length} onClick={() => applySourceTaxTypeToSelected('NET')}>Marcar seleccionados: neto</button><button type="button" className="button primary compact" disabled={!selected.length} onClick={() => applySourceTaxTypeToSelected('GROSS')}>Marcar seleccionados: final con IVA</button></div></div>
         <div className="bulk-category-action"><label className="field">Asignar categoría a los seleccionados<input list="bulk-category-options" value={bulkCategory} maxLength={80} placeholder="Escribe o elige una categoría" onChange={event => setBulkCategory(event.target.value)}/><datalist id="bulk-category-options">{Array.from(new Set(products.map(product=>product.category).filter(Boolean))).map(category=><option key={category} value={category}/>)}</datalist></label><button type="button" className="button outline compact" disabled={!selected.length||!bulkCategory.trim()} onClick={applyCategoryToSelected}>Aplicar a {selected.length} productos</button></div>
         <div className="bulk-utility form-grid"><label className="field">Regla de utilidad<select value={utilityMode} onChange={event => setUtilityMode(event.target.value as UtilityMode)}><option value="MARKUP">Recargo sobre costo</option><option value="MARGIN">Margen sobre precio de venta</option></select></label><label className="field">Porcentaje (%)<input type="number" min="0" max={utilityMode === 'MARGIN' ? 99 : 1000} step="1" value={utilityPercent} onChange={event => setUtilityPercent(Math.max(0, Number(event.target.value)))}/></label><div className="bulk-formula"><b>{utilityMode === 'MARKUP' ? `Costo × (1 + ${utilityPercent}%)` : `Costo ÷ (1 − ${utilityPercent}%)`}</b><span>El catálogo calcula el precio de venta sugerido con esta regla.</span></div></div>
         <div className="bulk-table-wrap"><table className="bulk-product-table"><thead><tr><th>✓</th><th>Producto</th><th>Marca / SKU</th><th>Costo neto CLP</th><th>Precio de origen e IVA</th><th>Venta sugerida</th><th>Unidad / categoría</th></tr></thead><tbody>{products.map((product, index) => {
